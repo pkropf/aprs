@@ -8,8 +8,8 @@ APRS Python Module.
 ~~~~
 
 
-:author: Greg Albrecht W2GMD <gba@onbeep.com>
-:copyright: Copyright 2013 OnBeep, Inc.
+:author: Greg Albrecht W2GMD <gba@orionlabs.io>
+:copyright: Copyright 2016 Orion Labs, Inc.
 :license: Apache License, Version 2.0
 :source: <https://github.com/ampledata/aprs>
 
@@ -17,7 +17,7 @@ APRS Python Module.
 
 import logging
 
-from .classes import APRS, APRSKISS
+from .classes import APRS, APRSKISS, SerialGPSPoller
 
 
 # Set default logging handler to avoid "No handler found" warnings.

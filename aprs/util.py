@@ -3,74 +3,15 @@
 
 """Utilities for the APRS Python Module."""
 
-__author__ = 'Greg Albrecht W2GMD <gba@onbeep.com>'
+__author__ = 'Greg Albrecht W2GMD <gba@orionlabs.io>'
 __license__ = 'Apache License, Version 2.0'
-__copyright__ = 'Copyright 2013 OnBeep, Inc.'
+__copyright__ = 'Copyright 2016 Orion Labs, Inc.'
 
 
 import logging
 
 import aprs.constants
-import aprs.decimaldegrees
 import kiss.constants
-
-
-logger = logging.getLogger(__name__)
-logger.setLevel(aprs.constants.LOG_LEVEL)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(aprs.constants.LOG_LEVEL)
-console_handler.setFormatter(
-    logging.Formatter(aprs.constants.LOG_FORMAT))
-logger.addHandler(console_handler)
-logger.propagate = False
-
-
-def dec2dm_lat(dec):
-    """Converts DecDeg to APRS Coord format.
-    See: http://ember2ash.com/lat.htm
-
-    Source: http://stackoverflow.com/questions/2056750
-
-    Example:
-        >>> test_lat = 37.7418096
-        >>> aprs_lat = dec2dm_lat(test_lat)
-        >>> aprs_lat
-        '3744.51N'
-    """
-    dec_min = aprs.decimaldegrees.decimal2dm(dec)
-
-    deg = dec_min[0]
-    abs_deg = abs(deg)
-
-    if not deg == abs_deg:
-        suffix = 'S'
-    else:
-        suffix = 'N'
-
-    return ''.join([str(abs_deg), "%.2f" % dec_min[1], suffix])
-
-
-def dec2dm_lng(dec):
-    """Converts DecDeg to APRS Coord format.
-    See: http://ember2ash.com/lat.htm
-
-    Example:
-        >>> test_lng = -122.38833
-        >>> aprs_lng = dec2dm_lng(test_lng)
-        >>> aprs_lng
-        '12223.30W'
-    """
-    dec_min = aprs.decimaldegrees.decimal2dm(dec)
-
-    deg = dec_min[0]
-    abs_deg = abs(deg)
-
-    if not deg == abs_deg:
-        suffix = 'W'
-    else:
-        suffix = 'E'
-
-    return ''.join([str(abs_deg), "%.2f" % dec_min[1], suffix])
 
 
 def decode_aprs_ascii_frame(ascii_frame):
@@ -83,15 +24,15 @@ def decode_aprs_ascii_frame(ascii_frame):
     :returns: Dictionary of APRS Frame parts: source, destination, path, text.
     :rtype: dict
     """
-    logger.debug('frame=%s', ascii_frame)
+    logging.debug('frame=%s', ascii_frame)
     decoded_frame = {}
     frame_so_far = ''
 
     for char in ascii_frame:
-        if '>' in char and not 'source' in decoded_frame:
+        if '>' in char and 'source' not in decoded_frame:
             decoded_frame['source'] = frame_so_far
             frame_so_far = ''
-        elif ':' in char and not 'path' in decoded_frame:
+        elif ':' in char and 'path' not in decoded_frame:
             decoded_frame['path'] = frame_so_far
             frame_so_far = ''
         else:
@@ -114,7 +55,8 @@ def format_aprs_frame(frame):
     :rtype: str
     """
     formatted_frame = '>'.join([frame['source'], frame['destination']])
-    formatted_frame = ','.join([formatted_frame, frame['path']])
+    if frame['path']:
+        formatted_frame = ','.join([formatted_frame, frame['path']])
     formatted_frame = ':'.join([formatted_frame, frame['text']])
     return formatted_frame
 
@@ -162,7 +104,7 @@ def valid_callsign(callsign):
     :returns: True if valid, False otherwise.
     :rtype: bool
     """
-    logger.debug('callsign=%s', callsign)
+    logging.debug('callsign=%s', callsign)
 
     if '-' in callsign:
         if not callsign.count('-') == 1:
@@ -172,7 +114,7 @@ def valid_callsign(callsign):
     else:
         ssid = 0
 
-    logger.debug('callsign=%s ssid=%s', callsign, ssid)
+    logging.debug('callsign=%s ssid=%s', callsign, ssid)
 
     if (len(callsign) < 2 or len(callsign) > 6 or len(str(ssid)) < 1 or
             len(str(ssid)) > 2):
@@ -310,24 +252,72 @@ def decode_frame(raw_frame):
             if ord(raw_frame[raw_slice]) & 0x01 and ((raw_slice + 1) % 7) == 0:
                 i = (raw_slice + 1) / 7
                 # Less than 2 callsigns?
-                if 2 < i < 10:
+                if 1 < i < 11:
                     if (ord(raw_frame[raw_slice + 1]) & 0x03 == 0x03 and
-                            ord(raw_frame[raw_slice + 2]) == 0xf0):
+                            ord(raw_frame[raw_slice + 2]) in [0xf0, 0xcf]):
                         frame['text'] = raw_frame[raw_slice + 3:]
                         frame['destination'] = full_callsign(
                             extract_callsign(raw_frame))
                         frame['source'] = full_callsign(
                             extract_callsign(raw_frame[7:]))
                         frame['path'] = format_path(i, raw_frame)
+                        return frame
 
     logging.debug('frame=%s', frame)
     return frame
 
 
+def create_location_frame(source, latitude, longitude, altitude, course, speed,
+                          symboltable, symbolcode, comment=None,
+                          destination='APRS', path=None):
+    """
+    Creates an APRS Location frame.
+
+    :param source: Source callsign (or callsign + SSID).
+    :param latitude: Latitude.
+    :param longitude: Longitude.
+    :param altitude: Altitude.
+    :param course: Course.
+    :param speed: Speed.
+    :param symboltable: APRS Symboltable.
+    :param symbolcode: APRS Symbolcode.
+    :param comment: Comment field. Default: Module + version.
+    :param destination: Destination callsign. Default: 'APRS'.
+    :param path: APRS Path.
+
+    :return: APRS location frame.
+    :rtype: str
+    """
+    comment = comment or 'APRS Python Module'
+
+    location_text = ''.join([
+        '!',
+        latitude,
+        symboltable,
+        longitude,
+        symbolcode,
+        "%03d" % course,
+        '/',
+        "%03d" % speed,
+        '/',
+        'A=',
+        "%06d" % altitude,
+        ' ',
+        comment
+    ])
+    frame_dict = {
+        'source': source,
+        'destination': destination,
+        'path': path,
+        'text': location_text
+    }
+    return format_aprs_frame(frame_dict)
+
+
 def run_doctest():  # pragma: no cover
     """Runs doctests for this module."""
     import doctest
-    import aprs.util  # pylint: disable=W0406
+    import aprs.util  # pylint: disable=W0406,W0621
     return doctest.testmod(aprs.util)
 
 

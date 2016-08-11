@@ -5,9 +5,9 @@
 Constants for APRS Module.
 """
 
-__author__ = 'Greg Albrecht W2GMD <gba@onbeep.com>'
+__author__ = 'Greg Albrecht W2GMD <gba@orionlabs.io>'
 __license__ = 'Apache License, Version 2.0'
-__copyright__ = 'Copyright 2013 OnBeep, Inc.'
+__copyright__ = 'Copyright 2016 Orion Labs, Inc.'
 
 
 import logging
@@ -20,10 +20,14 @@ APRSIS_HTTP_HEADERS = {
 }
 APRSIS_SERVER = 'rotate.aprs.net'
 APRSIS_FILTER_PORT = 14580
+APRSIS_RX_PORT = 8080
 
 RECV_BUFFER = 1024
 
 
 LOG_LEVEL = logging.INFO
-LOG_FORMAT = ('%(asctime)s %(levelname)s %(name)s.%(funcName)s:%(lineno)d'
-              ' - %(message)s')
+LOG_FORMAT = logging.Formatter(
+    ('%(asctime)s %(levelname)s %(name)s.%(funcName)s:%(lineno)d - '
+     '%(message)s'))
+
+GPS_WARM_UP = 5
